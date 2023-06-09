@@ -1,0 +1,6 @@
+beautifulsoup4==4.12.2
+google_api_python_client==2.88.0
+gradio==3.34.0
+openai==0.27.5
+Requests==2.31.0
+wikipedia==1.4.0
