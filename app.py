@@ -1,173 +1,212 @@
-import openai
-from googleapiclient.discovery import build
-import requests
-import json
-import wikipedia
-import requests
-from bs4 import BeautifulSoup
-import gradio as gr
+from flask import Flask, render_template_string, request, jsonify
+from gradio_client import Client
 
-# Set up the OpenAI API client
-openai.api_key = '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'  # Replace with your actual API key
+app = Flask(__name__)
 
-# Set up your YouTube Data API credentials
-youtube_api_key = 'AIzaSyDYzXAkPqU6ODnGX9rEEcvL64xh29_LRVs'  # Replace with your actual YouTube API key
+@app.route('/', methods=['GET'])
+def index():
+    return render_template_string('''
+       <!DOCTYPE html>
+<html>
+<head>
+    <title>Osana WEB-GPT</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #dbdbdb;
+            margin: 20px;
+            padding: 0;
+        }
 
-# Set up Google SERP API credentials
-serp_api_key = '03c74289238ba82d2889379e7a958a07b56c45de'  # Replace with your actual Google SERP API key
+        .chat-container {
+            position: relative;
+            width: 100%;
+            height: 90vh;
+            margin: 0 auto;
+            background-color: #ffffff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
 
-# Function to send a message and receive a response from the chatbot
-def chat(message):
-    try:
-        response = openai.Completion.create(
-            engine='text-davinci-003',  # Choose the language model/engine you want to use
-            prompt=message,
-            max_tokens=50,  # Adjust the response length as needed
-            n=1,  # Number of responses to generate
-            stop=None,  # Specify a stop token to end the response
-        )
-        return response.choices[0].text.strip()
-    except Exception as e:
-        print("An error occurred:", e)
-        return ""
+        .chat-container::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 123, 255, 0.1);
+            z-index: -1;
+            animation: pulseAnimation 2s linear infinite;
+        }
 
-# Function to search for YouTube videos
-def search_videos(query, max_results=5):
-    # Build the YouTube API client
-    youtube = build('youtube', 'v3', developerKey=youtube_api_key)
+        @keyframes pulseAnimation {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.05);
+                opacity: 0.8;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
 
-    # Make a search request to retrieve video results
-    search_response = youtube.search().list(
-        q=query,
-        part='id',
-        maxResults=max_results,
-        type='video'
-    ).execute()
+        .chat-header {
+            background-color: #007bff;
+            color: #ffffff;
+            padding: 10px;
+            text-align: center;
+            font-size: 40px;
+        }
 
-    # Extract the video links from the search response
-    video_links = []
-    for item in search_response['items']:
-        video_id = item['id']['videoId']
-        video_link = f'https://www.youtube.com/watch?v={video_id}'
-        video_links.append(video_link)
+        .chat-body {
+            padding: 20px;
+            height: 80%;
+            overflow-y: scroll;
+        }
 
-    return video_links
+        .chat-bubble {
+            margin-bottom: 20px;
+            width: 100%;
+        }
 
-# Function to get the latest answers from Google SERP API
-def get_latest_answers(query):
-    url = "https://google.serper.dev/search"
+        .user-bubble {
+            background-color: #007bff;
+            color: #ffffff;
+            padding: 10px;
+            border-radius: 30px 0px 30px 30px;
+            text-align: right;
+        }
 
-    payload = json.dumps({
-        "q": query
-    })
-    headers = {
-        'X-API-KEY': serp_api_key,
-        'Content-Type': 'application/json'
+        .bot-bubble {
+            background-color: #f0f0f0;
+            color: #000000;
+            padding: 10px;
+            border-radius: 0px 30px 30px 30px;
+        }
+
+        .chat-form {
+            display: flex;
+            margin-top: 20px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-bottom: 1px solid #aaaaaa;
+            font-size: 16px;
+            outline: none;
+            color: #000000;
+            margin-bottom: 0;
+            border-radius: 10px;
+        }
+
+        .chat-submit {
+            margin-left: 10px;
+            padding: 10px 20px;
+            border: none;
+            background-color: #007bff;
+            color: #ffffff;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 30px;
+            transition: background-color 0.3s;
+        }
+
+        .chat-submit:hover {
+            background-color: #0056b3;
+        }
+        @media (max-width: 400px) {
+    .chat-header {
+        font-size: 30px;
     }
 
-    response = requests.request("POST", url, headers=headers, data=payload)
+    @media (max-width: 330px) {
+    .chat-header {
+        font-size: 20px;
+    }
+    }
+    .chat-bubble {
+            font-size: 80%;
+        }
+}
 
-    try:
-        # Parse the response JSON
-        data = json.loads(response.text)
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chat-container">
+            <div class="chat-header">Osana Web-GPT</div>
+            <div class="chat-body" id="chat-body">
+                <div class="chat-bubble bot-bubble">Welcome to the Osana Web-GPT! Ask me anything.</div>
+            </div>
+        </div>
+        
+        <form id="question-form" class="chat-form">
+            <div class="input-group">
+                <input type="text" id="question-input" name="question" placeholder="Type your message here" class="form-control">
+                <div class="input-group-append">
+                    <button type="submit" class="btn btn-primary"><i class="fa fa-send"></i></button>
+                </div>
+            </div>
+        </form>
+    </div>
 
-        # Extract details from the response
-        output = ""
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        document.getElementById('question-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            var question = document.getElementById('question-input').value;
+            var chatBody = document.getElementById('chat-body');
+            var userBubble = document.createElement('div');
+            userBubble.className = 'chat-bubble user-bubble';
+            userBubble.textContent = question;
+            chatBody.appendChild(userBubble);
+            scrollToBottom(chatBody);
+            document.getElementById('question-input').value = '';
+            fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'question=' + encodeURIComponent(question)
+            })
+            .then(response => response.json())
+            .then(result => {
+                var botBubble = document.createElement('div');
+                botBubble.className = 'chat-bubble bot-bubble';
+                botBubble.textContent = result['response'];
+                chatBody.appendChild(botBubble);
+                scrollToBottom(chatBody);
+            });
+        });
 
-        if 'knowledgeGraph' in data:
-            knowledge_graph = data['knowledgeGraph']
-            output += "Website: {}\n".format(knowledge_graph.get('website'))
-            output += "Description: {}\n".format(knowledge_graph.get('description'))
+        function scrollToBottom(element) {
+            element.scrollTop = element.scrollHeight;
+        }
+    </script>
+</body>
+</html>
 
-        if 'organic' in data:
-            organic_results = data['organic']
-            for result in organic_results:
-                output += "Snippet: {}\n".format(result.get('snippet'))
+    ''')
 
-        if 'peopleAlsoAsk' in data:
-            people_also_ask = data['peopleAlsoAsk']
-            for question in people_also_ask:
-                output += "Snippet: {}\n".format(question.get('snippet'))
+@app.route('/predict', methods=['POST'])
+def predict():
+    client = Client("https://malmika-osana-web-gpt.hf.space/")
+    prompt = request.form['question']
+    result = client.predict(prompt, api_name="/predict")
+    return jsonify({'response': result})
 
-        return output
-
-    except json.JSONDecodeError:
-        print(".")
-        return ""
-
-    except Exception as e:
-        print(".")
-        return ""
-
-# Function to search Wikipedia for an answer and summarize it
-def search_wikipedia(query):
-    try:
-        search_results = wikipedia.search(query)
-
-        # Get the page summary of the first search result
-        if search_results:
-            page_title = search_results[0]
-            page_summary = wikipedia.summary(page_title)
-            return page_summary
-        else:
-            print(".")
-            return None
-    except wikipedia.exceptions.DisambiguationError as e:
-        # Handle disambiguation error
-        print(".")
-        return None
-    except wikipedia.exceptions.PageError as e:
-        # Handle page not found error
-        print(".")
-        return None
-    except Exception as e:
-        # Handle other exceptions
-        print(".")
-        return None
-
-# Function to generate summarized paragraph using OpenAI API
-def generate_summary(user_input):
-    output = get_latest_answers(user_input)
-    page_summary = search_wikipedia(user_input)
-    chat_answer = chat(user_input)
-
-    # Generate summarized paragraph using OpenAI API
-    response = openai.Completion.create(
-        engine='text-davinci-003',
-        prompt=f"Data from Google SERP API:\n{output}\nWikipedia summary:\n{page_summary}\n\nOpenAI chat response:\n{chat_answer}\n\nSummarize the above data into a paragraph.",
-        max_tokens=200
-    )
-    summarized_paragraph = response.choices[0].text.strip()
-
-    return summarized_paragraph
-
-# Define the Gradio interface
-def summarizer_interface(user_input):
-    summarized_text = generate_summary(user_input)
-    video_links = search_videos(user_input)
-    return summarized_text, video_links
-
-iface = gr.Interface(
-    fn=summarizer_interface,
-    inputs="text",
-    outputs=["text", "text"],
-    title="Osana Web-GPT",
-    description="Enter your query and get latest and better answer.",
-    layout="horizontal",
-    examples=[
-        ["What is the capital of France?"],
-        ["How does photosynthesis work?"],
-        ["Who is the president of the United States?"],
-        ["What is the capital of Japan?"],
-        ["How do I bake a chocolate cake?"],
-        ["What is the meaning of life?"],
-        ["Who painted the Mona Lisa?"],
-        ["What is the population of New York City?"],
-        ["How does the internet work?"],
-        ["What is the largest planet in our solar system?"],
-        ["What are the benefits of regular exercise?"],
-        ]
-)
-
-# Launch the interface
-iface.launch()
+if __name__ == '__main__':
+    app.run(debug=True)
