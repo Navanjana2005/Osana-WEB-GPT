@@ -1,2 +1,2 @@
 flask
-gradio_client
+gradio-client
