@@ -17,7 +17,7 @@ def index():
         body {
             font-family: Arial, sans-serif;
             background-color: #dbdbdb;
-            margin: 20px;
+            margin: 5px;
             padding: 0;
         }
 
