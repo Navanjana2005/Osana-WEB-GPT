@@ -24,7 +24,7 @@ def index():
         .chat-container {
             position: relative;
             width: 100%;
-            height: 90vh;
+            height: 88vh;
             margin: 0 auto;
             background-color: #ffffff;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -65,6 +65,7 @@ def index():
             padding: 10px;
             text-align: center;
             font-size: 40px;
+            border-radius: 10px;
         }
 
         .chat-body {
